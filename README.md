@@ -40,7 +40,7 @@ Hoja de ruta corta:
 2. [x] Descubrimiento de equipos activos (con auto-detección de red).
 3. [x] Escaneo multi-sala: recorrer varias subredes desde la configuración.
 4. [x] Inventario de servicios/puertos de cada equipo.
-5. [ ] Chequeo de configuraciones de riesgo y credenciales por defecto (Opción A).
+5. [x] Análisis de riesgo de los servicios + aviso de credenciales por defecto (Opción A).
 6. [ ] Generación del informe.
 7. [ ] (Futuro) Interfaz web para que la dirección la ejecute sin depender del área técnica.
 

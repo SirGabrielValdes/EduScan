@@ -21,6 +21,7 @@ from eduscan.discovery import (
     descubrir_equipos,
 )
 from eduscan.network import RedError, detectar_red_local
+from eduscan.risk import analizar_servicios, nivel_maximo
 from eduscan.scanning import escanear_puertos
 
 
@@ -151,10 +152,15 @@ def _cmd_scan(args: argparse.Namespace) -> int:
             total_equipos += 1
             nombre = equipo.hostname or "(sin nombre)"
             servicios = escanear_puertos(equipo.ip, intensidad=intensidad)
-            print(f"  {equipo.ip:<16} {nombre}")
-            if servicios:
-                for servicio in servicios:
-                    print(f"      - puerto {servicio.puerto}: {servicio.nombre}")
+            hallazgos = analizar_servicios(servicios)
+            riesgo = nivel_maximo(hallazgos)
+            print(f"  {equipo.ip:<16} {nombre}  [riesgo: {riesgo}]")
+            if hallazgos:
+                for h in hallazgos:
+                    cred = "  (revisar credenciales de fabrica)" if h.revisar_credenciales else ""
+                    print(f"      [{h.nivel}] puerto {h.puerto} {h.servicio}{cred}")
+                    print(f"            {h.motivo}")
+                    print(f"            Recomendacion: {h.recomendacion}")
             else:
                 print("      (sin puertos comunes abiertos)")
 
