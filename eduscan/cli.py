@@ -14,7 +14,12 @@ import sys
 
 from eduscan import __version__
 from eduscan.config import Config, ConfigError, cargar_config
-from eduscan.discovery import DescubrimientoError, contar_hosts, descubrir_equipos
+from eduscan.discovery import (
+    DescubrimientoError,
+    contar_hosts,
+    descubrir_en_redes,
+    descubrir_equipos,
+)
 from eduscan.network import RedError, detectar_red_local
 
 
@@ -32,7 +37,46 @@ def _cmd_validate(args: argparse.Namespace) -> int:
 
 
 def _cmd_discover(args: argparse.Namespace) -> int:
-    """Descubre los equipos activos en la red (auto-detectada o indicada)."""
+    """Descubre equipos activos: en varias salas (config) o en una red."""
+    if args.config:
+        return _discover_desde_config(args)
+    return _discover_una_red(args)
+
+
+def _discover_desde_config(args: argparse.Namespace) -> int:
+    """Recorre todas las subredes autorizadas de un archivo de configuracion."""
+    try:
+        config = cargar_config(args.config)
+    except ConfigError as exc:
+        print(f"Configuracion invalida: {exc}", file=sys.stderr)
+        return 1
+
+    print(f"Institucion: {config.autorizacion.institucion}")
+    print(f"Responsable: {config.autorizacion.responsable}")
+    print(f"Subredes autorizadas: {len(config.subredes)}")
+    print(f"Intensidad: {config.intensidad}\n")
+
+    try:
+        resultados = descubrir_en_redes(
+            config.subredes, intensidad=config.intensidad
+        )
+    except DescubrimientoError as exc:
+        print(f"No se pudo completar el descubrimiento: {exc}", file=sys.stderr)
+        return 1
+
+    total = 0
+    for red, equipos in resultados.items():
+        print(f"Red {red}:")
+        _mostrar_equipos(equipos, sangria="  ")
+        print()
+        total += len(equipos)
+
+    print(f"Total de equipos activos en todas las salas: {total}")
+    return 0
+
+
+def _discover_una_red(args: argparse.Namespace) -> int:
+    """Descubre equipos en una sola red (auto-detectada o indicada)."""
     try:
         if args.red:
             red = ipaddress.ip_network(args.red, strict=False)
@@ -77,16 +121,15 @@ def _confirmar_autorizacion(red: ipaddress.IPv4Network, asumir_si: bool) -> bool
     return respuesta.strip().lower() in ("si", "s", "sí", "yes", "y")
 
 
-def _mostrar_equipos(equipos: list) -> None:
+def _mostrar_equipos(equipos: list, sangria: str = "") -> None:
     if not equipos:
-        print("No se encontraron equipos activos.")
+        print(f"{sangria}No se encontraron equipos activos.")
         return
 
-    print(f"\nEquipos activos encontrados: {len(equipos)}")
-    print("-" * 40)
+    print(f"{sangria}Equipos activos encontrados: {len(equipos)}")
     for equipo in equipos:
         nombre = equipo.hostname or "(sin nombre)"
-        print(f"  {equipo.ip:<16} {nombre}")
+        print(f"{sangria}  {equipo.ip:<16} {nombre}")
 
 
 def _mostrar_resumen(config: Config) -> None:
@@ -135,6 +178,14 @@ def construir_parser() -> argparse.ArgumentParser:
     p_discover = subparsers.add_parser(
         "discover",
         help="Descubre los equipos activos en la red local.",
+    )
+    p_discover.add_argument(
+        "--config",
+        default=None,
+        help=(
+            "Archivo de configuracion con varias subredes autorizadas (modo "
+            "multi-sala). Tiene prioridad sobre --red y la auto-deteccion."
+        ),
     )
     p_discover.add_argument(
         "--red",

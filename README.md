@@ -36,12 +36,13 @@ y la **carga/validación de la configuración**. Todavía no escanea la red.
 
 Hoja de ruta corta:
 
-1. ✅ Esqueleto del proyecto + configuración autorizada.
-2. ⬜ Descubrimiento de equipos activos.
-3. ⬜ Inventario de servicios/puertos.
-4. ⬜ Chequeo de configuraciones de riesgo y credenciales por defecto (Opción A).
-5. ⬜ Generación del informe.
-6. ⬜ (Futuro) Interfaz web para que la dirección la ejecute sin depender del área técnica.
+1. [x] Esqueleto del proyecto + configuración autorizada.
+2. [x] Descubrimiento de equipos activos (con auto-detección de red).
+3. [x] Escaneo multi-sala: recorrer varias subredes desde la configuración.
+4. [ ] Inventario de servicios/puertos.
+5. [ ] Chequeo de configuraciones de riesgo y credenciales por defecto (Opción A).
+6. [ ] Generación del informe.
+7. [ ] (Futuro) Interfaz web para que la dirección la ejecute sin depender del área técnica.
 
 ## Instalación (desarrollo)
 
@@ -61,6 +62,19 @@ cp config.example.yaml config.yaml
 
 # 3. Valida que la configuración es correcta
 python -m eduscan.cli validate --config config.yaml
+```
+
+### Descubrir equipos activos
+
+```bash
+# Auto-detecta la red donde está la laptop y pide confirmación (ideal en la sala)
+python -m eduscan.cli discover
+
+# Recorre TODAS las subredes autorizadas del config (modo multi-sala / central)
+python -m eduscan.cli discover --config config.yaml
+
+# Escanear una red concreta
+python -m eduscan.cli discover --red 192.168.1.0/24
 ```
 
 ## Arquitectura

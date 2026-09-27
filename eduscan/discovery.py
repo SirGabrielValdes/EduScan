@@ -114,3 +114,33 @@ def descubrir_equipos(
     ]
     equipos.sort(key=lambda e: ipaddress.ip_address(e.ip))
     return equipos
+
+
+def descubrir_en_redes(
+    redes: list[ipaddress.IPv4Network],
+    intensidad: str = "suave",
+    max_hosts: int = MAX_HOSTS_POR_DEFECTO,
+) -> dict[str, list[Equipo]]:
+    """Descubre equipos activos en varias redes (p. ej. varias salas).
+
+    Es la base del modelo "central": recorre una lista de subredes autorizadas
+    y devuelve los equipos encontrados en cada una. Reutilizable por la CLI de
+    hoy y por una futura interfaz web.
+
+    Args:
+        redes: lista de redes a explorar.
+        intensidad: "suave" o "normal".
+        max_hosts: tope de direcciones por red.
+
+    Returns:
+        Diccionario {red (str): lista de equipos}, en el orden recibido.
+
+    Raises:
+        DescubrimientoError: si alguna red supera ``max_hosts``.
+    """
+    resultados: dict[str, list[Equipo]] = {}
+    for red in redes:
+        resultados[str(red)] = descubrir_equipos(
+            red, intensidad=intensidad, max_hosts=max_hosts
+        )
+    return resultados
