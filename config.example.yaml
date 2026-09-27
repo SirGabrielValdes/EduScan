@@ -1,0 +1,36 @@
+# Configuración de ejemplo de EduScan
+#
+# Copia este archivo a "config.yaml" y ajústalo a tu colegio:
+#     cp config.example.yaml config.yaml
+#
+# IMPORTANTE: config.yaml queda ignorado por git (ver .gitignore) porque
+# contiene información específica de tu red. Nunca lo subas al repositorio.
+
+# --- Marco de autorización -------------------------------------------------
+# Estos datos deben coincidir con SCOPE.md. Sirven para dejar constancia de
+# quién autoriza el escaneo. EduScan exige que "autorizado" sea true para operar.
+autorizacion:
+  institucion: "Nombre del colegio"
+  autoriza: "Cargo de quien autoriza (p. ej. Dirección)"
+  responsable: "Tu nombre"
+  autorizado: false        # cámbialo a true una vez tengas el permiso por escrito
+
+# --- Subredes dentro del alcance -------------------------------------------
+# Solo estas subredes serán analizadas. Usa notación CIDR.
+# Deben coincidir con las listadas en SCOPE.md.
+subredes:
+  - "192.168.1.0/24"       # ejemplo: red administrativa
+
+# --- Intensidad del escaneo ------------------------------------------------
+# "suave" es la opción recomendada para no afectar equipos frágiles.
+# Valores posibles: suave | normal
+intensidad: "suave"
+
+# --- Chequeos a realizar ---------------------------------------------------
+# Activa o desactiva módulos. En este primer ladrillo aún no se ejecutan;
+# solo se validan.
+chequeos:
+  descubrimiento_equipos: true
+  inventario_servicios: true
+  configuraciones_riesgo: true
+  credenciales_por_defecto: true   # Opción A: solo advierte, no prueba contraseñas

@@ -1,0 +1,23 @@
+# Configuración específica de la red del colegio: nunca subir al repo
+config.yaml
+
+# Informes generados
+informes/
+*.report.md
+*.report.html
+
+# Entornos virtuales de Python
+.venv/
+venv/
+env/
+
+# Cachés y compilados de Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+
+# Editores / SO
+.vscode/
+.idea/
+.DS_Store
