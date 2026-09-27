@@ -41,7 +41,7 @@ Hoja de ruta corta:
 3. [x] Escaneo multi-sala: recorrer varias subredes desde la configuración.
 4. [x] Inventario de servicios/puertos de cada equipo.
 5. [x] Análisis de riesgo de los servicios + aviso de credenciales por defecto (Opción A).
-6. [ ] Generación del informe.
+6. [x] Generación del informe para directivos (Markdown y HTML imprimible a PDF).
 7. [ ] (Futuro) Interfaz web para que la dirección la ejecute sin depender del área técnica.
 
 ## Instalación (desarrollo)
@@ -84,6 +84,20 @@ python -m eduscan.cli discover --red 192.168.1.0/24
 python -m eduscan.cli scan                       # red auto-detectada
 python -m eduscan.cli scan --config config.yaml  # todas las salas del config
 ```
+
+### Generar el informe para directivos
+
+```bash
+# HTML (recomendado): se abre en el navegador y se guarda como PDF
+python -m eduscan.cli report --config config.yaml
+
+# Markdown, o una ruta concreta
+python -m eduscan.cli report --config config.yaml --formato md
+python -m eduscan.cli report --red 192.168.1.0/24 --salida informe.html
+```
+
+El informe se guarda por defecto en `informes/informe-FECHA.html`. Para obtener
+un PDF, ábrelo en el navegador y usa "Imprimir -> Guardar como PDF".
 
 ## Arquitectura
 

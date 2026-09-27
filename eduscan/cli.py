@@ -11,8 +11,11 @@ from __future__ import annotations
 import argparse
 import ipaddress
 import sys
+from datetime import date
+from pathlib import Path
 
 from eduscan import __version__
+from eduscan.audit import auditar_redes
 from eduscan.config import Config, ConfigError, cargar_config
 from eduscan.discovery import (
     DescubrimientoError,
@@ -21,8 +24,7 @@ from eduscan.discovery import (
     descubrir_equipos,
 )
 from eduscan.network import RedError, detectar_red_local
-from eduscan.risk import analizar_servicios, nivel_maximo
-from eduscan.scanning import escanear_puertos
+from eduscan.report import generar_html, generar_markdown
 
 
 def _cmd_validate(args: argparse.Namespace) -> int:
@@ -106,65 +108,109 @@ def _discover_una_red(args: argparse.Namespace) -> int:
     return 0
 
 
-def _cmd_scan(args: argparse.Namespace) -> int:
-    """Descubre equipos y luego inventaria los puertos/servicios abiertos."""
-    # 1) Determinar las redes a escanear y la intensidad (misma logica que discover).
+def _resolver_objetivo(args: argparse.Namespace):
+    """Determina redes/intensidad/datos segun --config, --red o auto-deteccion.
+
+    Devuelve una tupla (codigo, redes, intensidad, institucion, responsable).
+    Si 'codigo' no es None, el comando debe terminar devolviendo ese codigo.
+    """
     if args.config:
         try:
             config = cargar_config(args.config)
         except ConfigError as exc:
             print(f"Configuracion invalida: {exc}", file=sys.stderr)
-            return 1
-        redes = config.subredes
-        intensidad = config.intensidad
-        print(f"Institucion: {config.autorizacion.institucion}")
+            return 1, [], "", "", ""
+        return (
+            None,
+            config.subredes,
+            config.intensidad,
+            config.autorizacion.institucion,
+            config.autorizacion.responsable,
+        )
+
+    try:
+        if args.red:
+            red = ipaddress.ip_network(args.red, strict=False)
+        else:
+            red = detectar_red_local(prefijo=args.prefijo)
+    except (RedError, ValueError) as exc:
+        print(f"No se pudo determinar la red: {exc}", file=sys.stderr)
+        return 1, [], "", "", ""
+
+    print(f"Red detectada: {red} ({contar_hosts(red)} direcciones posibles)")
+    if not _confirmar_autorizacion(red, asumir_si=args.si):
+        print("Operacion cancelada.")
+        return 0, [], "", "", ""
+    return None, [red], args.intensidad, "", ""
+
+
+def _cmd_scan(args: argparse.Namespace) -> int:
+    """Descubre equipos, inventaria puertos y muestra el riesgo por pantalla."""
+    codigo, redes, intensidad, _, _ = _resolver_objetivo(args)
+    if codigo is not None:
+        return codigo
+
+    print(f"\nAuditando (intensidad: {intensidad})...")
+    try:
+        equipos = auditar_redes(redes, intensidad=intensidad)
+    except DescubrimientoError as exc:
+        print(f"No se pudo completar la auditoria: {exc}", file=sys.stderr)
+        return 1
+
+    if not equipos:
+        print("No se encontraron equipos activos.")
+        return 0
+
+    for equipo in equipos:
+        nombre = equipo.hostname or "(sin nombre)"
+        print(f"\n  {equipo.ip:<16} {nombre}  [riesgo: {equipo.nivel}]  (red {equipo.red})")
+        if not equipo.hallazgos:
+            print("      (sin puertos comunes abiertos)")
+            continue
+        for h in equipo.hallazgos:
+            cred = "  (revisar credenciales de fabrica)" if h.revisar_credenciales else ""
+            print(f"      [{h.nivel}] puerto {h.puerto} {h.servicio}{cred}")
+            print(f"            {h.motivo}")
+            print(f"            Recomendacion: {h.recomendacion}")
+
+    print(f"\nEquipos inventariados: {len(equipos)}")
+    return 0
+
+
+def _cmd_report(args: argparse.Namespace) -> int:
+    """Ejecuta la auditoria y guarda el informe en un archivo (md/html)."""
+    codigo, redes, intensidad, institucion, responsable = _resolver_objetivo(args)
+    if codigo is not None:
+        return codigo
+    if args.institucion:
+        institucion = args.institucion
+
+    print(f"\nAuditando (intensidad: {intensidad})...")
+    try:
+        equipos = auditar_redes(redes, intensidad=intensidad)
+    except DescubrimientoError as exc:
+        print(f"No se pudo completar la auditoria: {exc}", file=sys.stderr)
+        return 1
+
+    fecha = date.today().isoformat()
+    if args.formato == "md":
+        contenido = generar_markdown(equipos, institucion, responsable, fecha)
+        extension = "md"
     else:
-        try:
-            if args.red:
-                red = ipaddress.ip_network(args.red, strict=False)
-            else:
-                red = detectar_red_local(prefijo=args.prefijo)
-        except (RedError, ValueError) as exc:
-            print(f"No se pudo determinar la red: {exc}", file=sys.stderr)
-            return 1
-        print(f"Red detectada: {red} ({contar_hosts(red)} direcciones posibles)")
-        if not _confirmar_autorizacion(red, asumir_si=args.si):
-            print("Escaneo cancelado.")
-            return 0
-        redes = [red]
-        intensidad = args.intensidad
+        contenido = generar_html(equipos, institucion, responsable, fecha)
+        extension = "html"
 
-    # 2) Descubrir equipos vivos y 3) inventariar sus puertos.
-    total_equipos = 0
-    for red in redes:
-        print(f"\nRed {red}: buscando equipos (intensidad: {intensidad})...")
-        try:
-            equipos = descubrir_equipos(red, intensidad=intensidad)
-        except DescubrimientoError as exc:
-            print(f"  No se pudo completar el descubrimiento: {exc}", file=sys.stderr)
-            continue
+    if args.salida:
+        ruta = Path(args.salida)
+    else:
+        ruta = Path("informes") / f"informe-{fecha}.{extension}"
+    ruta.parent.mkdir(parents=True, exist_ok=True)
+    ruta.write_text(contenido, encoding="utf-8")
 
-        if not equipos:
-            print("  No se encontraron equipos activos.")
-            continue
-
-        for equipo in equipos:
-            total_equipos += 1
-            nombre = equipo.hostname or "(sin nombre)"
-            servicios = escanear_puertos(equipo.ip, intensidad=intensidad)
-            hallazgos = analizar_servicios(servicios)
-            riesgo = nivel_maximo(hallazgos)
-            print(f"  {equipo.ip:<16} {nombre}  [riesgo: {riesgo}]")
-            if hallazgos:
-                for h in hallazgos:
-                    cred = "  (revisar credenciales de fabrica)" if h.revisar_credenciales else ""
-                    print(f"      [{h.nivel}] puerto {h.puerto} {h.servicio}{cred}")
-                    print(f"            {h.motivo}")
-                    print(f"            Recomendacion: {h.recomendacion}")
-            else:
-                print("      (sin puertos comunes abiertos)")
-
-    print(f"\nEquipos inventariados: {total_equipos}")
+    print(f"Informe guardado en: {ruta}")
+    print(f"Equipos incluidos: {len(equipos)}")
+    if extension == "html":
+        print("Sugerencia: abrelo en el navegador y usa 'Imprimir -> Guardar como PDF'.")
     return 0
 
 
@@ -252,6 +298,29 @@ def construir_parser() -> argparse.ArgumentParser:
     )
     _agregar_args_objetivo(p_scan)
     p_scan.set_defaults(func=_cmd_scan)
+
+    p_report = subparsers.add_parser(
+        "report",
+        help="Ejecuta la auditoria y genera un informe (Markdown o HTML).",
+    )
+    _agregar_args_objetivo(p_report)
+    p_report.add_argument(
+        "--formato",
+        default="html",
+        choices=("html", "md"),
+        help="Formato del informe (por defecto: html, imprimible a PDF).",
+    )
+    p_report.add_argument(
+        "--salida",
+        default=None,
+        help="Ruta del archivo de salida (por defecto: informes/informe-FECHA.EXT).",
+    )
+    p_report.add_argument(
+        "--institucion",
+        default=None,
+        help="Nombre de la institucion para el encabezado del informe.",
+    )
+    p_report.set_defaults(func=_cmd_report)
 
     return parser
 
