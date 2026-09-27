@@ -39,7 +39,7 @@ Hoja de ruta corta:
 1. [x] Esqueleto del proyecto + configuración autorizada.
 2. [x] Descubrimiento de equipos activos (con auto-detección de red).
 3. [x] Escaneo multi-sala: recorrer varias subredes desde la configuración.
-4. [ ] Inventario de servicios/puertos.
+4. [x] Inventario de servicios/puertos de cada equipo.
 5. [ ] Chequeo de configuraciones de riesgo y credenciales por defecto (Opción A).
 6. [ ] Generación del informe.
 7. [ ] (Futuro) Interfaz web para que la dirección la ejecute sin depender del área técnica.
@@ -75,6 +75,14 @@ python -m eduscan.cli discover --config config.yaml
 
 # Escanear una red concreta
 python -m eduscan.cli discover --red 192.168.1.0/24
+```
+
+### Inventariar puertos/servicios
+
+```bash
+# Descubre equipos y lista qué puertos/servicios tiene abierto cada uno
+python -m eduscan.cli scan                       # red auto-detectada
+python -m eduscan.cli scan --config config.yaml  # todas las salas del config
 ```
 
 ## Arquitectura

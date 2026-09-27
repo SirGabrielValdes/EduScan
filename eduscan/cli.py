@@ -21,6 +21,7 @@ from eduscan.discovery import (
     descubrir_equipos,
 )
 from eduscan.network import RedError, detectar_red_local
+from eduscan.scanning import escanear_puertos
 
 
 def _cmd_validate(args: argparse.Namespace) -> int:
@@ -104,6 +105,63 @@ def _discover_una_red(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_scan(args: argparse.Namespace) -> int:
+    """Descubre equipos y luego inventaria los puertos/servicios abiertos."""
+    # 1) Determinar las redes a escanear y la intensidad (misma logica que discover).
+    if args.config:
+        try:
+            config = cargar_config(args.config)
+        except ConfigError as exc:
+            print(f"Configuracion invalida: {exc}", file=sys.stderr)
+            return 1
+        redes = config.subredes
+        intensidad = config.intensidad
+        print(f"Institucion: {config.autorizacion.institucion}")
+    else:
+        try:
+            if args.red:
+                red = ipaddress.ip_network(args.red, strict=False)
+            else:
+                red = detectar_red_local(prefijo=args.prefijo)
+        except (RedError, ValueError) as exc:
+            print(f"No se pudo determinar la red: {exc}", file=sys.stderr)
+            return 1
+        print(f"Red detectada: {red} ({contar_hosts(red)} direcciones posibles)")
+        if not _confirmar_autorizacion(red, asumir_si=args.si):
+            print("Escaneo cancelado.")
+            return 0
+        redes = [red]
+        intensidad = args.intensidad
+
+    # 2) Descubrir equipos vivos y 3) inventariar sus puertos.
+    total_equipos = 0
+    for red in redes:
+        print(f"\nRed {red}: buscando equipos (intensidad: {intensidad})...")
+        try:
+            equipos = descubrir_equipos(red, intensidad=intensidad)
+        except DescubrimientoError as exc:
+            print(f"  No se pudo completar el descubrimiento: {exc}", file=sys.stderr)
+            continue
+
+        if not equipos:
+            print("  No se encontraron equipos activos.")
+            continue
+
+        for equipo in equipos:
+            total_equipos += 1
+            nombre = equipo.hostname or "(sin nombre)"
+            servicios = escanear_puertos(equipo.ip, intensidad=intensidad)
+            print(f"  {equipo.ip:<16} {nombre}")
+            if servicios:
+                for servicio in servicios:
+                    print(f"      - puerto {servicio.puerto}: {servicio.nombre}")
+            else:
+                print("      (sin puertos comunes abiertos)")
+
+    print(f"\nEquipos inventariados: {total_equipos}")
+    return 0
+
+
 def _confirmar_autorizacion(red: ipaddress.IPv4Network, asumir_si: bool) -> bool:
     """Pide confirmacion explicita de autorizacion antes de escanear.
 
@@ -179,7 +237,22 @@ def construir_parser() -> argparse.ArgumentParser:
         "discover",
         help="Descubre los equipos activos en la red local.",
     )
-    p_discover.add_argument(
+    _agregar_args_objetivo(p_discover)
+    p_discover.set_defaults(func=_cmd_discover)
+
+    p_scan = subparsers.add_parser(
+        "scan",
+        help="Descubre equipos e inventaria sus puertos/servicios abiertos.",
+    )
+    _agregar_args_objetivo(p_scan)
+    p_scan.set_defaults(func=_cmd_scan)
+
+    return parser
+
+
+def _agregar_args_objetivo(sub: argparse.ArgumentParser) -> None:
+    """Argumentos comunes para elegir qué red(es) analizar."""
+    sub.add_argument(
         "--config",
         default=None,
         help=(
@@ -187,31 +260,28 @@ def construir_parser() -> argparse.ArgumentParser:
             "multi-sala). Tiene prioridad sobre --red y la auto-deteccion."
         ),
     )
-    p_discover.add_argument(
+    sub.add_argument(
         "--red",
         default=None,
         help="Red a escanear en notacion CIDR. Si se omite, se auto-detecta.",
     )
-    p_discover.add_argument(
+    sub.add_argument(
         "--prefijo",
         type=int,
         default=24,
         help="Tamano de prefijo al auto-detectar (por defecto: 24).",
     )
-    p_discover.add_argument(
+    sub.add_argument(
         "--intensidad",
         default="suave",
         choices=("suave", "normal"),
         help="Intensidad del escaneo (por defecto: suave).",
     )
-    p_discover.add_argument(
+    sub.add_argument(
         "--si",
         action="store_true",
         help="Asume 'si' en la confirmacion de autorizacion (uso no interactivo).",
     )
-    p_discover.set_defaults(func=_cmd_discover)
-
-    return parser
 
 
 def main(argv: list[str] | None = None) -> int:
