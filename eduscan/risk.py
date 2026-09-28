@@ -69,6 +69,41 @@ _REGLAS: dict[int, dict] = {
         "motivo": "Compartir archivos (SMB) ha sido vector de ransomware conocido.",
         "recomendacion": "Actualiza el sistema y limita quién puede acceder.",
     },
+    554: {
+        "nivel": "ALTO",
+        "motivo": "Cámara IP (RTSP) expuesta; suele traer usuario/contraseña de fábrica.",
+        "recomendacion": "Cambia las credenciales de la cámara y restringe su acceso por red.",
+        "cred": True,
+    },
+    1883: {
+        "nivel": "MEDIO",
+        "motivo": "MQTT (IoT) suele quedar sin autenticación, exponiendo dispositivos.",
+        "recomendacion": "Exige autenticación y limita el acceso al servicio.",
+        "cred": True,
+    },
+    2323: {
+        "nivel": "ALTO",
+        "motivo": "Telnet (puerto alternativo) envía las contraseñas sin cifrar.",
+        "recomendacion": "Desactívalo y usa SSH en su lugar.",
+        "cred": True,
+    },
+    5985: {
+        "nivel": "MEDIO",
+        "motivo": "Gestión remota de Windows (WinRM) expuesta amplía la superficie de ataque.",
+        "recomendacion": "Limita su acceso a administradores y por red de gestión.",
+    },
+    6379: {
+        "nivel": "ALTO",
+        "motivo": "Redis suele quedar accesible sin contraseña; cualquiera podría leer/borrar datos.",
+        "recomendacion": "Exige contraseña y que solo lo use el servidor que lo necesita.",
+        "cred": True,
+    },
+    27017: {
+        "nivel": "ALTO",
+        "motivo": "MongoDB expuesto ha filtrado datos por quedar sin autenticación.",
+        "recomendacion": "Exige autenticación y restríngelo al servidor que lo usa.",
+        "cred": True,
+    },
     139: {
         "nivel": "MEDIO",
         "motivo": "NetBIOS/SMB antiguo amplía la superficie de ataque.",
@@ -95,6 +130,24 @@ _REGLAS: dict[int, dict] = {
     8080: {
         "nivel": "MEDIO",
         "motivo": "Panel web alternativo sin cifrar; frecuente en dispositivos de administración.",
+        "recomendacion": "Usa HTTPS y cambia la contraseña por defecto.",
+        "cred": True,
+    },
+    5000: {
+        "nivel": "MEDIO",
+        "motivo": "Panel/servicio web sin cifrar; frecuente en dispositivos y aplicaciones.",
+        "recomendacion": "Usa HTTPS y revisa que no tenga la contraseña de fábrica.",
+        "cred": True,
+    },
+    8000: {
+        "nivel": "MEDIO",
+        "motivo": "Panel/servicio web alternativo sin cifrar.",
+        "recomendacion": "Usa HTTPS y cambia la contraseña por defecto.",
+        "cred": True,
+    },
+    8888: {
+        "nivel": "MEDIO",
+        "motivo": "Panel/servicio web alternativo sin cifrar.",
         "recomendacion": "Usa HTTPS y cambia la contraseña por defecto.",
         "cred": True,
     },

@@ -41,3 +41,26 @@ def test_nivel_maximo():
 
 def test_nivel_maximo_sin_hallazgos():
     assert nivel_maximo([]) == "INFO"
+
+
+def test_camara_rtsp_es_riesgo_alto_con_credenciales():
+    hallazgos = analizar_servicios([Servicio(puerto=554, nombre="RTSP")])
+    assert hallazgos[0].nivel == "ALTO"
+    assert hallazgos[0].revisar_credenciales is True
+
+
+def test_bases_de_datos_expuestas_son_riesgo_alto():
+    for puerto in (6379, 27017):
+        hallazgos = analizar_servicios([Servicio(puerto=puerto, nombre="BD")])
+        assert hallazgos[0].nivel == "ALTO"
+
+
+def test_todos_los_puertos_comunes_tienen_analisis():
+    # Cada puerto conocido debe producir un hallazgo con un nivel valido.
+    from eduscan.risk import NIVELES
+    from eduscan.scanning import PUERTOS_COMUNES
+
+    servicios = [Servicio(puerto=p, nombre=n) for p, n in PUERTOS_COMUNES.items()]
+    hallazgos = analizar_servicios(servicios)
+    assert len(hallazgos) == len(PUERTOS_COMUNES)
+    assert all(h.nivel in NIVELES for h in hallazgos)
